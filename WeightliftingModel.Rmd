@@ -1,0 +1,143 @@
+---
+title: "Evaluating Proper Weightlifting Form Using Machine Learning"
+author: "Kristen Borchert"
+date: "July 22, 2014"
+output: html_document
+---
+
+## Overview
+This report, an assignment for the Coursera Practical Machine Learning class, documents
+the development of a machine learning algorithm which predicts how well a user performed
+a weightlifting exercise (barbell lift) using accelerometer measurements.  
+
+The data for this report comes from a research study where six participants, were asked to perform barbell lifts while wearing accelerometers and using a dumbbell with an accelerometer. The participants performed one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).  The original data and more information about the study can be found at: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+The main objectives of this analysis are:  
+* Build a machine learning algorithm to predict exercise quality (specified in the "classe" variable) from activity monitor data.  
+* Define expected out of sample error and estimate error using cross-validation.  
+* Use the prediction model to predict 20 different test cases provided. 
+
+## Data Processing
+### Set up
+In preparation for data processing, set the working directory to the appropriate location, load
+required packages and read the training data and the testing data.  The testing data (pml-testing.csv)
+will be used for the final assessment of the performance of the algorithm.  The training
+data (pml-training) will be subdivided into train and test sets for model development and
+assessment.  Note that this code assumes that the user has downloaded the files to a sub directory called "data" that resides within the working directory.  The links for the files are also provided.
+```{r, setup}
+setwd("~/Documents/Practical Machine Learning/Practical-Machine-Learning-Project")
+require(caret)
+data <- read.csv ("data/pml-training.csv", na.strings = c("NA", ""))
+# This file may be read directly from: 
+# https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+finaltest <- read.csv ("data/pml-testing.csv", na.strings = c("NA", ""))
+# This file may be read directly from: 
+# https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+set.seed(1234)
+```
+### Cleaning the Data  
+In looking at the data, it is apparent that there are many columns containing a 
+large number of NA values; in fact, 60 of the 160 columns contain mostly NA values (19216 of 19622).
+To simplify data analyses, only columns with no NA values are included.  In addition to this,
+the first seven columns contain user and timestamp data which is irrelevant to this analysis
+which are also removed.
+```{r, datasets}
+dim(data)
+# How many columns contain NA values?
+na_test = sapply(data, function(x) {sum(is.na(x))})
+table(na_test)
+data.sub <- data[ , which (na_test==0)]
+clean.data <- data.sub[, -c(1:7)]
+```
+### Creating training and test datasets
+Training and test datasets are created from the cleaned version of the pml-training.csv file.
+```{r, datapartition}
+inTrain = createDataPartition(y=clean.data$classe, p=0.7, list=FALSE)
+training = clean.data[inTrain,]
+testing = clean.data[-inTrain,]
+dim(training); dim(testing)
+```
+## Exploratory Data Analysis
+The training data set appears to have a fairly even distribution of all five classes of 
+("Classe") exercise performance characteristics.
+```{r, plot1}
+plot(training$classe, col = "darkred", main="Frequency Distribution of Classe Variable in Training Data Set")
+```
+## Building the Model
+Because random forests are usually top performing algorithms in prediction contests,
+this model was chosen here. Two different re-sampling methods were tested: cross-validation (cv; modfit1) and the default, bootstrapping (boot, modfit2). The former produced a model with higher accuracy and thus lower out of sample error than the latter. The prediction model specified by 
+modfit1 was used for evaluation of the 20 test cases provided for the class assignment.
+
+### Fitting the Model on the Training Data
+For modfit1, the trainControl function was used to control the re-sampling method, specifying
+it as cross-validation, with 4 sub-samples.    
+For modfit2, the default bootstrap method was used.  
+Because modfit1 produced higher accuracy, it was used for determination of out of sample error.
+```{r, cvrandomforest, cache=TRUE}
+fitControl <- trainControl(method = "cv", number=4)
+modfit1 <- train(factor(classe) ~ ., data=training, method="rf", trControl = fitControl)
+modfit2 <- train(factor(classe) ~ ., data=training, method="rf")
+modfit1
+modfit2
+```
+
+### Determining in Sample and Out of Sample Error; Cross Validation Error Estimate
+In Sample Error is the error rate obtained on the same data used to create the model, while Out of Sample Error is the error rate obtained using the model on new data. To cross-validate
+the error estimate, the new data used in this example is the testing dataset set aside at the beginning.  
+
+For both error rates:  
+Error = 1 - Accuracy.  
+
+For the model created using Random Forest, modfit1, the In Sample Error is 1-1 = 0!
+Out of Sample Error for modfit1 is 1-0.9949 = 0.0051 or 0.5%.  
+
+#### In Sample Error
+```{r, iserror}
+training_pred <- predict(modfit1, training)
+confusionMatrix(training_pred, training$classe)
+```
+#### Out of Sample Error
+
+```{r, ooserror}
+test_pred <- predict(modfit1, testing)
+confusionMatrix(test_pred, testing$classe)
+```
+
+## Conclusion  
+Through the course of this analysis, a predictive model for assessing the quality of
+weightlifting exercise based upon accelerometer data has been built. This model, which
+uses the Random Forest method has an estimated out of sample error rate of 0.5%.  In real world
+data sets the error rate is likely to be higher than this, but regardless, use of accelerometer
+data to assess exercise quality appears promising.
+
+## Testing the Model  
+In this section, the machine learning algorithm built above is applied to the
+20 test cases.
+
+```{r, cleanfinal}
+final.sub <- finaltest[ , which (na_test==0)]
+final.data <- final.sub[, -c(1:7)]
+```
+
+```{r}
+answers <- predict(modfit1, final.data)
+answers <- as.character(answers)
+answers
+
+```
+
+Finally, write the answers to files as specified in the course instructions
+
+```{r}
+pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(as.character(x[i]), file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
+
+pml_write_files(answers)
+```
+
