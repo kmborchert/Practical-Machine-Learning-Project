@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Practical-machine-learning-project : " />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Practical-machine-learning-project</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/kmborchert/Practical-Machine-Learning-Project">View on GitHub</a>
+
+          <h1 id="project_title">Practical-machine-learning-project</h1>
+          <h2 id="project_tagline"></h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/kmborchert/Practical-Machine-Learning-Project/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/kmborchert/Practical-Machine-Learning-Project/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>&lt;!DOCTYPE html&gt;</p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>
+
+<p></p>Evaluating Proper Weightlifting Form Using Machine Learning<p></p>
+
+code{white-space: pre;}<p></p>
+
+
+  pre:not([class]) {
+    background-color: white;
+  }
+<p></p>
+
+<p></p>
+
+<div>
+
+
+<div>
+<h1>
+<a name="evaluating-proper-weightlifting-form-using-machine-learning" class="anchor" href="#evaluating-proper-weightlifting-form-using-machine-learning"><span class="octicon octicon-link"></span></a>Evaluating Proper Weightlifting Form Using Machine Learning</h1>
+<h4>
+<a name="kristen-borchert" class="anchor" href="#kristen-borchert"><span class="octicon octicon-link"></span></a><em>Kristen Borchert</em>
+</h4>
+<h4>
+<a name="july-22-2014" class="anchor" href="#july-22-2014"><span class="octicon octicon-link"></span></a><em>July 22, 2014</em>
+</h4>
+</div>
+
+<div>
+<h2>
+<a name="overview" class="anchor" href="#overview"><span class="octicon octicon-link"></span></a>Overview</h2>
+<p>This report, an assignment for the Coursera Practical Machine Learning class, documents the development of a machine learning algorithm which predicts how well a user performed a weightlifting exercise (barbell lift) using accelerometer measurements.</p>
+<p>The data for this report comes from a research study where six participants, were asked to perform barbell lifts while wearing accelerometers and using a dumbbell with an accelerometer. The participants performed one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). The original data and more information about the study can be found at: <a href="http://groupware.les.inf.puc-rio.br/har">http://groupware.les.inf.puc-rio.br/har</a> (see the section on the Weight Lifting Exercise Dataset).</p>
+<p>The main objectives of this analysis are:<br>* Build a machine learning algorithm to predict exercise quality (specified in the “classe” variable) from activity monitor data.<br>* Define expected out of sample error and estimate error using cross-validation.<br>* Use the prediction model to predict 20 different test cases provided.</p>
+</div>
+
+<div>
+<h2>
+<a name="data-processing" class="anchor" href="#data-processing"><span class="octicon octicon-link"></span></a>Data Processing</h2>
+<div>
+<h3>
+<a name="set-up" class="anchor" href="#set-up"><span class="octicon octicon-link"></span></a>Set up</h3>
+<p>In preparation for data processing, set the working directory to the appropriate location, load required packages and read the training data and the testing data. The testing data (pml-testing.csv) will be used for the final assessment of the performance of the algorithm. The training data (pml-training) will be subdivided into train and test sets for model development and assessment. Note that this code assumes that the user has downloaded the files to a sub directory called “data” that resides within the working directory. The links for the files are also provided.</p>
+<pre><code>setwd("~/Documents/Practical Machine Learning/Practical-Machine-Learning-Project")
+require(caret)</code></pre>
+<pre><code>## Loading required package: caret
+## Loading required package: lattice
+## Loading required package: ggplot2</code></pre>
+<pre><code>data &lt;- read.csv ("data/pml-training.csv", na.strings = c("NA", ""))
+# This file may be read directly from: 
+# https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+finaltest &lt;- read.csv ("data/pml-testing.csv", na.strings = c("NA", ""))
+# This file may be read directly from: 
+# https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+set.seed(1234)</code></pre>
+</div>
+
+<div>
+<h3>
+<a name="cleaning-the-data" class="anchor" href="#cleaning-the-data"><span class="octicon octicon-link"></span></a>Cleaning the Data</h3>
+<p>In looking at the data, it is apparent that there are many columns containing a large number of NA values; in fact, 60 of the 160 columns contain mostly NA values (19216 of 19622). To simplify data analyses, only columns with no NA values are included. In addition to this, the first seven columns contain user and timestamp data which is irrelevant to this analysis which are also removed.</p>
+<pre><code>dim(data)</code></pre>
+<pre><code>## [1] 19622   160</code></pre>
+<pre><code># How many columns contain NA values?
+na_test = sapply(data, function(x) {sum(is.na(x))})
+table(na_test)</code></pre>
+<pre><code>## na_test
+##     0 19216 
+##    60   100</code></pre>
+<pre><code>data.sub &lt;- data[ , which (na_test==0)]
+clean.data &lt;- data.sub[, -c(1:7)]</code></pre>
+</div>
+
+<div>
+<h3>
+<a name="creating-training-and-test-datasets" class="anchor" href="#creating-training-and-test-datasets"><span class="octicon octicon-link"></span></a>Creating training and test datasets</h3>
+<p>Training and test datasets are created from the cleaned version of the pml-training.csv file.</p>
+<pre><code>inTrain = createDataPartition(y=clean.data$classe, p=0.7, list=FALSE)
+training = clean.data[inTrain,]
+testing = clean.data[-inTrain,]
+dim(training); dim(testing)</code></pre>
+<pre><code>## [1] 13737    53</code></pre>
+<pre><code>## [1] 5885   53</code></pre>
+</div>
+
+<p></p>
+</div>
+
+<div>
+<h2>
+<a name="exploratory-data-analysis" class="anchor" href="#exploratory-data-analysis"><span class="octicon octicon-link"></span></a>Exploratory Data Analysis</h2>
+<p>The training data set appears to have a fairly even distribution of all five classes of (“Classe”) exercise performance characteristics.</p>
+<pre><code>plot(training$classe, col = "darkred", main="Frequency Distribution of Classe Variable in Training Data Set")</code></pre>
+<p><img alt="plot of chunk plot1"></p>
+</div>
+
+<div>
+<h2>
+<a name="building-the-model" class="anchor" href="#building-the-model"><span class="octicon octicon-link"></span></a>Building the Model</h2>
+<p>Because random forests are usually top performing algorithms in prediction contests, this model was chosen here. Two different re-sampling methods were tested: cross-validation (cv; modfit1) and the default, bootstrapping (boot, modfit2). The former produced a model with higher accuracy and thus lower out of sample error than the latter. The prediction model specified by modfit1 was used for evaluation of the 20 test cases provided for the class assignment.</p>
+<div>
+<h3>
+<a name="fitting-the-model-on-the-training-data" class="anchor" href="#fitting-the-model-on-the-training-data"><span class="octicon octicon-link"></span></a>Fitting the Model on the Training Data</h3>
+<p>For modfit1, the trainControl function was used to control the re-sampling method, specifying it as cross-validation, with 4 sub-samples.<br>For modfit2, the default bootstrap method was used.<br>Because modfit1 produced higher accuracy, it was used for determination of out of sample error.</p>
+<pre><code>fitControl &lt;- trainControl(method = "cv", number=4)
+modfit1 &lt;- train(factor(classe) ~ ., data=training, method="rf", trControl = fitControl)</code></pre>
+<pre><code>## Loading required package: randomForest
+## randomForest 4.6-7
+## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>modfit2 &lt;- train(factor(classe) ~ ., data=training, method="rf")
+modfit1</code></pre>
+<pre><code>## Random Forest 
+## 
+## 13737 samples
+##    52 predictors
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## No pre-processing
+## Resampling: Cross-Validated (4 fold) 
+## 
+## Summary of sample sizes: 10302, 10302, 10304, 10303 
+## 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy  Kappa  Accuracy SD  Kappa SD
+##   2     1         1      0.002        0.002   
+##   30    1         1      0.003        0.003   
+##   50    1         1      0.004        0.005   
+## 
+## Accuracy was used to select the optimal model using  the largest value.
+## The final value used for the model was mtry = 27.</code></pre>
+<pre><code>modfit2</code></pre>
+<pre><code>## Random Forest 
+## 
+## 13737 samples
+##    52 predictors
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## No pre-processing
+## Resampling: Bootstrapped (25 reps) 
+## 
+## Summary of sample sizes: 13737, 13737, 13737, 13737, 13737, 13737, ... 
+## 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy  Kappa  Accuracy SD  Kappa SD
+##   2     1         1      0.002        0.003   
+##   30    1         1      0.002        0.002   
+##   50    1         1      0.003        0.004   
+## 
+## Accuracy was used to select the optimal model using  the largest value.
+## The final value used for the model was mtry = 27.</code></pre>
+</div>
+
+<div>
+<h3>
+<a name="determining-in-sample-and-out-of-sample-error-cross-validation-error-estimate" class="anchor" href="#determining-in-sample-and-out-of-sample-error-cross-validation-error-estimate"><span class="octicon octicon-link"></span></a>Determining in Sample and Out of Sample Error; Cross Validation Error Estimate</h3>
+<p>In Sample Error is the error rate obtained on the same data used to create the model, while Out of Sample Error is the error rate obtained using the model on new data. To cross-validate the error estimate, the new data used in this example is the testing dataset set aside at the beginning.</p>
+<p>For both error rates:<br>Error = 1 - Accuracy.</p>
+<p>For the model created using Random Forest, modfit1, the In Sample Error is 1-1 = 0! Out of Sample Error for modfit1 is 1-0.9949 = 0.0051 or 0.5%.</p>
+<div>
+<h4>
+<a name="in-sample-error" class="anchor" href="#in-sample-error"><span class="octicon octicon-link"></span></a>In Sample Error</h4>
+<pre><code>training_pred &lt;- predict(modfit1, training)</code></pre>
+<pre><code>## Loading required package: randomForest
+## randomForest 4.6-7
+## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>confusionMatrix(training_pred, training$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 3906    0    0    0    0
+##          B    0 2658    0    0    0
+##          C    0    0 2396    0    0
+##          D    0    0    0 2252    0
+##          E    0    0    0    0 2525
+## 
+## Overall Statistics
+##                                 
+##                Accuracy : 1     
+##                  95% CI : (1, 1)
+##     No Information Rate : 0.284 
+##     P-Value [Acc &gt; NIR] : &lt;2e-16
+##                                 
+##                   Kappa : 1     
+##  Mcnemar's Test P-Value : NA    
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity             1.000    1.000    1.000    1.000    1.000
+## Specificity             1.000    1.000    1.000    1.000    1.000
+## Pos Pred Value          1.000    1.000    1.000    1.000    1.000
+## Neg Pred Value          1.000    1.000    1.000    1.000    1.000
+## Prevalence              0.284    0.193    0.174    0.164    0.184
+## Detection Rate          0.284    0.193    0.174    0.164    0.184
+## Detection Prevalence    0.284    0.193    0.174    0.164    0.184
+## Balanced Accuracy       1.000    1.000    1.000    1.000    1.000</code></pre>
+</div>
+
+<div>
+<h4>
+<a name="out-of-sample-error" class="anchor" href="#out-of-sample-error"><span class="octicon octicon-link"></span></a>Out of Sample Error</h4>
+<pre><code>test_pred &lt;- predict(modfit1, testing)
+confusionMatrix(test_pred, testing$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1674   11    0    0    0
+##          B    0 1127    4    0    1
+##          C    0    1 1018    6    1
+##          D    0    0    4  957    3
+##          E    0    0    0    1 1077
+## 
+## Overall Statistics
+##                                         
+##                Accuracy : 0.995         
+##                  95% CI : (0.992, 0.996)
+##     No Information Rate : 0.284         
+##     P-Value [Acc &gt; NIR] : &lt;2e-16        
+##                                         
+##                   Kappa : 0.993         
+##  Mcnemar's Test P-Value : NA            
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity             1.000    0.989    0.992    0.993    0.995
+## Specificity             0.997    0.999    0.998    0.999    1.000
+## Pos Pred Value          0.993    0.996    0.992    0.993    0.999
+## Neg Pred Value          1.000    0.997    0.998    0.999    0.999
+## Prevalence              0.284    0.194    0.174    0.164    0.184
+## Detection Rate          0.284    0.192    0.173    0.163    0.183
+## Detection Prevalence    0.286    0.192    0.174    0.164    0.183
+## Balanced Accuracy       0.999    0.994    0.995    0.996    0.998</code></pre>
+</div>
+
+<p></p>
+</div>
+</div>
+
+<div>
+<h2>
+<a name="conclusion" class="anchor" href="#conclusion"><span class="octicon octicon-link"></span></a>Conclusion</h2>
+<p>Through the course of this analysis, a predictive model for assessing the quality of weightlifting exercise based upon accelerometer data has been built. This model, which uses the Random Forest method has an estimated out of sample error rate of 0.5%. In real world data sets the error rate is likely to be higher than this, but regardless, use of accelerometer data to assess exercise quality appears promising.</p>
+</div>
+
+<div>
+<h2>
+<a name="testing-the-model" class="anchor" href="#testing-the-model"><span class="octicon octicon-link"></span></a>Testing the Model</h2>
+<p>In this section, the machine learning algorithm built above is applied to the 20 test cases.</p>
+<pre><code>final.sub &lt;- finaltest[ , which (na_test==0)]
+final.data &lt;- final.sub[, -c(1:7)]</code></pre>
+<pre><code>answers &lt;- predict(modfit1, final.data)
+answers &lt;- as.character(answers)
+answers</code></pre>
+<pre><code>##  [1] "B" "A" "B" "A" "A" "E" "D" "B" "A" "A" "B" "C" "B" "A" "E" "E" "A"
+## [18] "B" "B" "B"</code></pre>
+<p>Finally, write the answers to files as specified in the course instructions</p>
+<pre><code>pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(as.character(x[i]), file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
+
+pml_write_files(answers)</code></pre>
+<div>
+
+</div>
+
+<p></p>
+</div>
+
+<p></p>
+</div>
+
+<p>
+</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Practical-machine-learning-project maintained by <a href="https://github.com/kmborchert">kmborchert</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
